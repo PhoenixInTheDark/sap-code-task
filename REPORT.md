@@ -32,7 +32,7 @@
    изменения обработчика, дополнения тестов и создания этого отчёта.
    Codex выполнил автоматические проверки, перечисленные выше.
 
-5. **Git:** https://github.com/PhoenixInTheDark/sap-code-task/commit/4fb536c5e6785028809a4201d238fab9785b8039.
+5. **Git:** https://github.com/PhoenixInTheDark/sap-code-task/commit/486892e9fd5bc5fc5de7aaa1a59600db7845abef.
 
 6. **Оставшиеся ограничения и риски:**
    - Ошибки диска, недоступная БД и превышение времени ожидания блокировки SQLite
