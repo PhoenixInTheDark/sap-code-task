@@ -31,6 +31,7 @@ class LeadProcessorTests(unittest.TestCase):
             return conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] if exists else 0
 
     def test_new_lead_creates_one_notification(self):
+        """Новая заявка создаётся с целочисленным ID и одним уведомлением."""
         response = process_event(dict(GOOD), self.db_path)
         self.assertEqual(response["status"], "created")
         self.assertIsInstance(response["id"], int)
@@ -38,6 +39,7 @@ class LeadProcessorTests(unittest.TestCase):
         self.assertEqual(self.count("notifications"), 1)
 
     def test_retry_is_duplicate_without_new_notification(self):
+        """Повтор возвращает прежний ID без новой заявки и уведомления."""
         first = process_event(dict(GOOD), self.db_path)
         second = process_event(dict(GOOD), self.db_path)
         self.assertEqual(second, {"status": "duplicate", "id": first["id"]})
@@ -45,6 +47,7 @@ class LeadProcessorTests(unittest.TestCase):
         self.assertEqual(self.count("notifications"), 1)
 
     def test_same_external_id_from_different_source_is_new(self):
+        """Одинаковый внешний ID из разных источников создаёт разные заявки."""
         first = process_event(dict(GOOD), self.db_path)
         second = process_event({**GOOD, "source": "max"}, self.db_path)
         self.assertEqual(first["status"], "created")
@@ -54,6 +57,7 @@ class LeadProcessorTests(unittest.TestCase):
         self.assertEqual(self.count("notifications"), 2)
 
     def test_missing_customer_is_invalid_and_not_saved(self):
+        """Имя клиента из одних пробелов отклоняется без записи в БД."""
         result = process_event({**GOOD, "customer": "   "}, self.db_path)
         self.assertEqual(result["status"], "invalid")
         self.assertTrue(result.get("reason"))
@@ -61,6 +65,7 @@ class LeadProcessorTests(unittest.TestCase):
         self.assertEqual(self.count("notifications"), 0)
 
     def test_whitespace_is_trimmed_before_comparison(self):
+        """Пробелы по краям источника и внешнего ID не мешают распознать повтор."""
         first = process_event({**GOOD, "source": " telegram ", "external_id": " event-100 "}, self.db_path)
         second = process_event(dict(GOOD), self.db_path)
         self.assertEqual(first["status"], "created")
@@ -68,6 +73,7 @@ class LeadProcessorTests(unittest.TestCase):
         self.assertEqual(self.count("leads"), 1)
 
     def test_first_event_data_is_preserved_on_retry(self):
+        """Повтор с изменённым текстом не перезаписывает исходные данные заявки."""
         first = process_event(dict(GOOD), self.db_path)
         response = process_event({**GOOD, "customer": "Другая подпись", "message": "Изменённый текст"}, self.db_path)
         self.assertEqual(response, {"status": "duplicate", "id": first["id"]})
@@ -76,17 +82,20 @@ class LeadProcessorTests(unittest.TestCase):
         self.assertEqual(row, (GOOD["customer"], GOOD["message"]))
 
     def test_duplicate_after_reopening_database(self):
+        """Повтор распознаётся и после открытия нового соединения с БД."""
         first = process_event(dict(GOOD), self.db_path)
         # Второй вызов открывает отдельное подключение к той же БД.
         second = process_event(dict(GOOD), self.db_path)
         self.assertEqual(second, {"status": "duplicate", "id": first["id"]})
 
     def test_non_string_field_is_invalid(self):
+        """Числовой внешний ID отклоняется: поле должно быть строкой."""
         response = process_event({**GOOD, "external_id": 100}, self.db_path)
         self.assertEqual(response["status"], "invalid")
         self.assertEqual(self.count("leads"), 0)
 
     def test_all_required_fields_are_validated(self):
+        """Отсутствующие, нестроковые и пустые поля отклоняются с причиной без записи в БД."""
         for field in GOOD:
             missing = dict(GOOD)
             del missing[field]
@@ -105,6 +114,7 @@ class LeadProcessorTests(unittest.TestCase):
                     self.assertEqual(self.count("notifications"), 0)
 
     def test_all_fields_are_trimmed_without_changing_content(self):
+        """Удаляются только крайние пробелы; регистр, внутренние пробелы и входной словарь сохраняются."""
         expected = {
             **GOOD, "source": "Telegram", "customer": "Имя  Клиента",
             "message": "Нужна  доставка в Казань",
